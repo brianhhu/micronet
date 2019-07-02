@@ -1,7 +1,7 @@
 import test_utils
 
 FLAGS = test_utils.parse_common_options(
-    datadir='./cifar-data',
+    datadir='../cifar-data',
     batch_size=128,
     num_epochs=20,
     momentum=0.9,
@@ -53,7 +53,7 @@ class BasicBlock(nn.Module):
 
 class ResNet(nn.Module):
 
-  def __init__(self, block, num_blocks, num_classes=10):
+  def __init__(self, block, num_blocks, num_classes=100):
     super(ResNet, self).__init__()
     self.in_planes = 64
 
