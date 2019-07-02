@@ -193,4 +193,6 @@ def train_cifar():
 
 # Train the model
 torch.set_default_tensor_type('torch.FloatTensor')
-train_cifar()
+acc = train_cifar()
+
+print('Final accuracy: {}'.format(acc))
