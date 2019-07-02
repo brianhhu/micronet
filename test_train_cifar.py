@@ -1,7 +1,7 @@
 import test_utils
 
 FLAGS = test_utils.parse_common_options(
-    datadir='/tmp/cifar-data',
+    datadir='./cifar-data',
     batch_size=128,
     num_epochs=20,
     momentum=0.9,
@@ -119,7 +119,7 @@ def train_cifar():
                              (0.2023, 0.1994, 0.2010)),
     ])
 
-    trainset = torchvision.datasets.CIFAR10(
+    trainset = torchvision.datasets.CIFAR100(
         root=FLAGS.datadir,
         train=True,
         download=True,
@@ -130,7 +130,7 @@ def train_cifar():
         shuffle=True,
         num_workers=FLAGS.num_workers)
 
-    testset = torchvision.datasets.CIFAR10(
+    testset = torchvision.datasets.CIFAR100(
         root=FLAGS.datadir,
         train=False,
         download=True,
