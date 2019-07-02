@@ -8,9 +8,7 @@ FLAGS = test_utils.parse_common_options(
     lr=0.1,
     target_accuracy=80.0)
 
-from common_utils import TestCase, run_tests
 import os
-import shutil
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,7 +19,6 @@ import torch_xla_py.utils as xu
 import torch_xla_py.xla_model as xm
 import torchvision
 import torchvision.transforms as transforms
-import unittest
 
 
 class BasicBlock(nn.Module):
@@ -194,17 +191,6 @@ def train_cifar():
   return accuracy * 100.0
 
 
-class TrainCIFAR10(TestCase):
-
-  def tearDown(self):
-    super(TrainCIFAR10, self).tearDown()
-    if FLAGS.tidy and os.path.isdir(FLAGS.datadir):
-      shutil.rmtree(FLAGS.datadir)
-
-  def test_accurracy(self):
-    self.assertGreaterEqual(train_cifar(), FLAGS.target_accuracy)
-
-
-# Run the tests.
+# Train the model
 torch.set_default_tensor_type('torch.FloatTensor')
-run_tests()
+train_cifar()
