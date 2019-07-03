@@ -32,7 +32,7 @@ class ResNet9(nn.Module):
         self.residual1 = Residual(d1, d2)
         self.inter = ConvBN(d2, d3)
         self.residual2 = Residual(d3, d4)
-        self.linear = nn.Linear(d4, 10, bias=False)
+        self.linear = nn.Linear(d4, 100, bias=False)
 
     def forward(self, x):
         x = self.pre(x)

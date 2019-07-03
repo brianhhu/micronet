@@ -52,7 +52,7 @@ class Residual(nn.Module):
 
 
 class BaiduNet(nn.Module):
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=100):
         super(BaiduNet, self).__init__()
         self.inchannel = 64
         self.conv1 = nn.Sequential(
