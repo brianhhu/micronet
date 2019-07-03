@@ -21,7 +21,7 @@ import torch_xla_py.xla_model as xm
 import torchvision
 import torchvision.transforms as transforms
 
-# import utilities and models
+# Import utilities and models
 from utilities import Cutout
 from models import BaiduNet8, ResNet9, ResNet18
 
@@ -98,7 +98,7 @@ def train_cifar():
         momentum=FLAGS.momentum,
         weight_decay=5e-4)
 
-    # lr scheduler
+    # LR scheduler
     scheduler = MultiStepLR(optimizer, milestones=[140, 190], gamma=0.1)
 
     tracker = xm.RateTracker()
@@ -131,11 +131,14 @@ def train_cifar():
   best_accuracy = 0.0
   for epoch in range(1, FLAGS.num_epochs + 1):
     scheduler = model_parallel(train_loop_fn, train_loader)
-    # scheduler.step()
+    
+    # Step LR scheduler
+    [s.step() for s in scheduler]
+
     accuracies = model_parallel(test_loop_fn, test_loader)
     accuracy = sum(accuracies) / len(devices)
 
-    # keep track of best model
+    # Keep track of best model
     if accuracy > best_accuracy:
       best_accuracy = accuracy
       torch.save(model.state_dict(), 'model.pt')
