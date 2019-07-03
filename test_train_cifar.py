@@ -83,7 +83,9 @@ def train_cifar():
   devices = xm.get_xla_supported_devices(max_devices=FLAGS.num_cores)
 
   # Select model here
-  model = ResNet18()
+  # model = BaiduNet8.BaiduNet8()
+  model = ResNet9.ResNet9(40, 80, 160, 320)
+  # model = ResNet18.ResNet18()
 
   # Pass [] as device_ids to run using the PyTorch/CPU engine.
   model_parallel = dp.DataParallel(model, device_ids=devices)
@@ -111,6 +113,7 @@ def train_cifar():
       if x % FLAGS.log_steps == 0:
         print('[{}]({}) Loss={:.5f} Rate={:.2f}'.format(device, x, loss.item(),
                                                         tracker.rate()))
+    return scheduler
 
   def test_loop_fn(model, loader, device, context):
     total_samples = 0
@@ -127,12 +130,14 @@ def train_cifar():
 
   best_accuracy = 0.0
   for epoch in range(1, FLAGS.num_epochs + 1):
-    model_parallel(train_loop_fn, train_loader)
+    scheduler = model_parallel(train_loop_fn, train_loader)
+    # scheduler.step()
     accuracies = model_parallel(test_loop_fn, test_loader)
     accuracy = sum(accuracies) / len(devices)
 
     # keep track of best model
     if accuracy > best_accuracy:
+      best_accuracy = accuracy
       torch.save(model.state_dict(), 'model.pt')
 
     if FLAGS.metrics_debug:
