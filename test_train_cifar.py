@@ -3,7 +3,7 @@ import test_utils
 FLAGS = test_utils.parse_common_options(
     datadir='../cifar-data',
     batch_size=128,
-    num_epochs=20,
+    num_epochs=300,
     momentum=0.9,
     lr=0.1,
     target_accuracy=80.0)
@@ -23,7 +23,7 @@ import torchvision.transforms as transforms
 
 # Import utilities and models
 from utilities import Cutout
-from models import BaiduNet8, ResNet9, ResNet18
+from models import BaiduNet8, ResNet9, ResNet18, WRN_McDonnell
 
 
 def train_cifar():
@@ -83,9 +83,10 @@ def train_cifar():
   devices = xm.get_xla_supported_devices(max_devices=FLAGS.num_cores)
 
   # Select model here
-  # model = BaiduNet8.BaiduNet8()
-  model = ResNet9.ResNet9(40, 80, 160, 320)
-  # model = ResNet18.ResNet18()
+  # model = BaiduNet8()
+  model = ResNet9(40, 80, 160, 320)
+  # model = ResNet18()
+  # model = WRN_McDonnell(20, 10, 100, binarize=True)
 
   # Pass [] as device_ids to run using the PyTorch/CPU engine.
   model_parallel = dp.DataParallel(model, device_ids=devices)
@@ -131,7 +132,7 @@ def train_cifar():
   best_accuracy = 0.0
   for epoch in range(1, FLAGS.num_epochs + 1):
     scheduler = model_parallel(train_loop_fn, train_loader)
-    
+
     # Step LR scheduler
     [s.step() for s in scheduler]
 
