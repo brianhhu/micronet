@@ -84,23 +84,26 @@ def train_cifar():
 
   # Select model here
   # model = BaiduNet8()
-  model = ResNet9(40, 80, 160, 320)
+  # model = ResNet9(40, 80, 160, 320)
   # model = ResNet18()
-  # model = WRN_McDonnell(20, 10, 100, binarize=True)
+  model = WRN_McDonnell(20, 10, 100, binarize=True)
 
   # Pass [] as device_ids to run using the PyTorch/CPU engine.
   model_parallel = dp.DataParallel(model, device_ids=devices)
 
   def train_loop_fn(model, loader, device, context):
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(
+    optimizer = context.getattr_or(
+        'optimizer', lambda: optim.SGD(
         model.parameters(),
         lr=FLAGS.lr,
         momentum=FLAGS.momentum,
-        weight_decay=5e-4)
+        weight_decay=5e-4))
 
     # LR scheduler
-    scheduler = MultiStepLR(optimizer, milestones=[140, 190], gamma=0.1)
+    scheduler = context.getattr_or(
+        'scheduler', lambda: MultiStepLR(
+        optimizer, milestones=[140, 190], gamma=0.1))
 
     tracker = xm.RateTracker()
 
@@ -114,7 +117,9 @@ def train_cifar():
       if x % FLAGS.log_steps == 0:
         print('[{}]({}) Loss={:.5f} Rate={:.2f}'.format(device, x, loss.item(),
                                                         tracker.rate()))
-    return scheduler
+
+    # Step LR scheduler
+    scheduler.step()
 
   def test_loop_fn(model, loader, device, context):
     total_samples = 0
@@ -131,11 +136,7 @@ def train_cifar():
 
   best_accuracy = 0.0
   for epoch in range(1, FLAGS.num_epochs + 1):
-    scheduler = model_parallel(train_loop_fn, train_loader)
-
-    # Step LR scheduler
-    [s.step() for s in scheduler]
-
+    model_parallel(train_loop_fn, train_loader)
     accuracies = model_parallel(test_loop_fn, test_loader)
     accuracy = sum(accuracies) / len(devices)
 
