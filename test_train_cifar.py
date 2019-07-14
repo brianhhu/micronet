@@ -3,7 +3,7 @@ import test_utils
 FLAGS = test_utils.parse_common_options(
     datadir='../cifar-data',
     batch_size=128,
-    num_epochs=300,
+    num_epochs=256,
     momentum=0.9,
     lr=0.1,
     target_accuracy=80.0)
@@ -13,7 +13,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.optim.lr_scheduler import MultiStepLR
 import torch_xla
 import torch_xla_py.data_parallel as dp
 import torch_xla_py.utils as xu
@@ -22,7 +21,8 @@ import torchvision
 import torchvision.transforms as transforms
 
 # Import utilities and models
-from utilities import Cutout
+from torch.optim.lr_scheduler import MultiStepLR
+from utilities import Cutout, CosineAnnealingRestartsLR
 from models import BaiduNet8, ResNet9, ResNet18, WRN_McDonnell
 
 
@@ -45,7 +45,7 @@ def train_cifar():
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        Cutout(8),  # add Cutout
+        Cutout(18),  # add Cutout
         transforms.Normalize((0.4914, 0.4822, 0.4465),
                              (0.2023, 0.1994, 0.2010)),
     ])
@@ -102,8 +102,8 @@ def train_cifar():
 
     # LR scheduler
     scheduler = context.getattr_or(
-        'scheduler', lambda: MultiStepLR(
-        optimizer, milestones=[140, 190], gamma=0.1))
+        'scheduler', lambda: CosineAnnealingRestartsLR(
+        optimizer, T=2, eta_min=1e-4))
 
     tracker = xm.RateTracker()
 
