@@ -105,7 +105,7 @@ def train_cifar():
         'scheduler', lambda: CosineAnnealingRestartsLR(
         optimizer, T=2, eta_min=1e-4))
 
-    tracker = xm.RateTracker()
+    # tracker = xm.RateTracker()
 
     for x, (data, target) in loader:
       optimizer.zero_grad()
@@ -113,10 +113,10 @@ def train_cifar():
       loss = loss_fn(output, target)
       loss.backward()
       xm.optimizer_step(optimizer)
-      tracker.add(FLAGS.batch_size)
-      if x % FLAGS.log_steps == 0:
-        print('[{}]({}) Loss={:.5f} Rate={:.2f}'.format(device, x, loss.item(),
-                                                        tracker.rate()))
+      # tracker.add(FLAGS.batch_size)
+      # if x % FLAGS.log_steps == 0:
+      #   print('[{}]({}) Loss={:.5f} Rate={:.2f}'.format(device, x, loss.item(),
+      #                                                   tracker.rate()))
 
     # Step LR scheduler
     scheduler.step()
@@ -130,8 +130,8 @@ def train_cifar():
       correct += pred.eq(target.view_as(pred)).sum().item()
       total_samples += data.size()[0]
 
-    print('[{}] Accuracy={:.2f}%'.format(device,
-                                         100.0 * correct / total_samples))
+    # print('[{}] Accuracy={:.2f}%'.format(device,
+    #                                      100.0 * correct / total_samples))
     return correct / total_samples
 
   best_accuracy = 0.0
@@ -139,6 +139,8 @@ def train_cifar():
     model_parallel(train_loop_fn, train_loader)
     accuracies = model_parallel(test_loop_fn, test_loader)
     accuracy = sum(accuracies) / len(devices)
+
+    print('Epoch {}, Accuracy={:.2f}%'.format(epoch, accuracy))
 
     # Keep track of best model
     if accuracy > best_accuracy:
