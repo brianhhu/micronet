@@ -43,7 +43,7 @@ def train_cifar():
   else:
     transform_train = transforms.Compose([
         # transforms.RandomCrop(32, padding=4),
-        transforms.Lambda(RandomPixelPad(padding=4)),
+        transforms.Lambda(lambda x: RandomPixelPad(x, padding=4)),
         transforms.RandomCrop(32),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),

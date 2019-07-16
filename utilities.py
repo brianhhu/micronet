@@ -22,7 +22,8 @@ class Cutout(object):
         x2 = int(np.clip(x + self._sz / 2, 0, w))
 
         if self.random_pixel:
-            img[:, y1:y2, x1:x2].random_(to=256) / 255.0
+            img[:, y1:y2, x1:x2].random_(to=256)
+            img[:, y1:y2, x1:x2] /= 255.0
         else:
             img[:, y1:y2, x1:x2].fill_(0.0)
         return img
@@ -37,8 +38,9 @@ def RandomPixelPad(img, padding=4):
         vec[vec.size-pad_width[1]:] = np.random.randint(0, 256, size=pad_width[1])
         return vec
 
-    img = np.asarray(img)
-    img = np.stack([np.pad(i, padding, pad_function) for i in img])
+    img = np.rollaxis(np.asarray(img), 2, 0)
+    img = np.stack([np.pad(i, padding, pad_function) for i in img], axis=2)
+    img = img.astype('uint8')
 
     return Image.fromarray(img)
 
