@@ -82,7 +82,9 @@ def train_cifar():
 
   torch.manual_seed(42)
 
-  devices = xm.get_xla_supported_devices(max_devices=FLAGS.num_cores)
+  devices = (
+      xm.get_xla_supported_devices(
+          max_devices=FLAGS.num_cores) if FLAGS.num_cores !=0 else [])
 
   # Select model here
   # model = BaiduNet8()
@@ -109,7 +111,8 @@ def train_cifar():
         optimizer, T=2, eta_min=1e-4))
 
     # tracker = xm.RateTracker()
-
+    
+    model.train()
     for x, (data, target) in loader:
       optimizer.zero_grad()
       output = model(data)
@@ -127,6 +130,7 @@ def train_cifar():
   def test_loop_fn(model, loader, device, context):
     total_samples = 0
     correct = 0
+    model.eval()
     for x, (data, target) in loader:
       output = model(data)
       pred = output.max(1, keepdim=True)[1]
