@@ -4,8 +4,9 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 
 class Cutout(object):
-    def __init__(self, sz):
+    def __init__(self, sz, random_pixel=False):
         self._sz = sz
+        self.random_pixel = random_pixel
 
     def __call__(self, img):
         h = img.size(1)
@@ -18,7 +19,11 @@ class Cutout(object):
         y2 = int(np.clip(y + self._sz / 2, 0, h))
         x1 = int(np.clip(x - self._sz / 2, 0, w))
         x2 = int(np.clip(x + self._sz / 2, 0, w))
-        img[:, y1:y2, x1:x2].fill_(0.0)
+
+        if self.random_pixel:
+            img[:, y1:y2, x1:x2].random_(to=256) / 255.0
+        else:
+            img[:, y1:y2, x1:x2].fill_(0.0)
         return img
 
 
