@@ -143,7 +143,7 @@ def train_cifar():
     accuracies = model_parallel(test_loop_fn, test_loader)
     accuracy = sum(accuracies) / len(devices)
 
-    print('Epoch {}, Accuracy={:.2f}%'.format(epoch, accuracy))
+    print('Epoch {}, Accuracy={:.2f}%'.format(epoch, 100.0 * accuracy))
 
     # Keep track of best model
     if accuracy > best_accuracy:
