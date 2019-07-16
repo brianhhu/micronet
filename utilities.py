@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from PIL import Image
 from torch.optim.lr_scheduler import _LRScheduler
 
 
@@ -25,6 +26,21 @@ class Cutout(object):
         else:
             img[:, y1:y2, x1:x2].fill_(0.0)
         return img
+
+
+def RandomPixelPad(img, padding=4):
+    """
+    Note: only supports integer padding
+    """
+    def pad_function(vec, pad_width, *_, **__):
+        vec[:pad_width[0]] = np.random.randint(0, 256, size=pad_width[0])
+        vec[vec.size-pad_width[1]:] = np.random.randint(0, 256, size=pad_width[1])
+        return vec
+
+    img = np.asarray(img)
+    img = np.stack([np.pad(i, padding, pad_function) for i in img])
+
+    return Image.fromarray(img)
 
 
 # Source: https://github.com/pytorch/pytorch/pull/11104

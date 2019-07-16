@@ -22,7 +22,7 @@ import torchvision.transforms as transforms
 
 # Import utilities and models
 from torch.optim.lr_scheduler import MultiStepLR
-from utilities import Cutout, CosineAnnealingRestartsLR
+from utilities import Cutout, RandomPixelPad, CosineAnnealingRestartsLR
 from models import BaiduNet8, ResNet9, ResNet18, WRN_McDonnell
 
 
@@ -42,7 +42,9 @@ def train_cifar():
         sample_count=10000 // FLAGS.batch_size)
   else:
     transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
+        # transforms.RandomCrop(32, padding=4),
+        transforms.Lambda(RandomPixelPad(padding=4)),
+        transforms.RandomCrop(32),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         Cutout(18, random_pixel=True),  # add Cutout
