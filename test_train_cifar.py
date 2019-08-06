@@ -23,7 +23,7 @@ import torchvision.transforms as transforms
 # Import utilities and models
 from torch.optim.lr_scheduler import MultiStepLR
 from utilities import Cutout, RandomPixelPad, CosineAnnealingRestartsLR
-from models import BaiduNet8, ResNet9, ResNet18, WRN_McDonnell
+from models import BaiduNet8, EfficientNetB0, ResNet9, ResNet18, WRN_McDonnell
 
 
 def train_cifar():
@@ -88,6 +88,7 @@ def train_cifar():
 
   # Select model here
   # model = BaiduNet8()
+  # model = EfficientNetB0()
   # model = ResNet9(40, 80, 160, 320)
   # model = ResNet9(64, 128, 256, 512)
   # model = ResNet18()
