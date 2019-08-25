@@ -2,7 +2,7 @@ import test_utils
 
 FLAGS = test_utils.parse_common_options(
     datadir='../cifar-data',
-    batch_size=128,
+    batch_size=125,
     num_epochs=254,
     momentum=0.9,
     lr=0.1,
