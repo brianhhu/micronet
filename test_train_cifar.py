@@ -153,7 +153,7 @@ def train_cifar():
     # Keep track of best model
     if accuracy > best_accuracy:
       best_accuracy = accuracy
-      torch.save(model.state_dict(), 'model.pt')
+      torch.save(model_parallel._models[0].state_dict(), 'model.pt')
 
     if FLAGS.metrics_debug:
       print(torch_xla._XLAC._xla_metrics_report())
