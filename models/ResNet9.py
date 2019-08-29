@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -41,6 +42,6 @@ class ResNet9(nn.Module):
         x = F.max_pool2d(x, 2)
         x = self.residual2(x)
         x = F.max_pool2d(x, 4)
-        x = x.view(x.size(0), -1)
+        x = torch.flatten(x, 1)
         x = self.linear(x)
         return x * 0.125

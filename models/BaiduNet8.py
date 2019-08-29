@@ -1,5 +1,6 @@
 '''BaiduNet-8 based on ResidualBlock
 '''
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -70,7 +71,7 @@ class BaiduNet(nn.Module):
         out = self.layer1(out)
         out = self.layer2(out)
         out = F.avg_pool2d(out, 8)
-        out = out.view(out.size(0), -1)
+        out = torch.flatten(out, 1)
         out = self.fc(out)
         return out
 

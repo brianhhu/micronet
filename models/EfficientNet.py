@@ -77,7 +77,7 @@ class EfficientNet(nn.Module):
     def forward(self, x):
         out = swish(self.bn1(self.conv1(x)))
         out = self.layers(out)
-        out = out.view(out.size(0), -1)
+        out = torch.flatten(out, 1)
         out = self.linear(out)
         return out
 
