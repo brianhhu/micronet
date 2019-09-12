@@ -40,6 +40,21 @@ class ModuleBinarizable(nn.Module):
         pass
 
 
+class Conv(ModuleBinarizable):
+    """Binarized convolution.
+    """
+
+    def __init__(self, name, in_channels, out_channels, kernel_size, binarize=False):
+        super().__init__(binarize)
+        self.name = name
+        self.padding = kernel_size // 2
+        self.register_parameter(name, init_weight(out_channels, in_channels, kernel_size, kernel_size))
+
+    def forward(self, x):
+        x = F.conv2d(x, self._get_weight(self.name), padding=self.padding)
+        return x
+
+
 class Block(ModuleBinarizable):
     """Pre-activated ResNet block.
     """
@@ -96,14 +111,16 @@ class WRN_McDonnell(ModuleBinarizable):
         widths = [int(v * width) for v in (16, 32, 64)]
         n = (depth - 2) // 6
 
-        self.register_parameter('conv0', init_weight(widths[0], 3, 3, 3))
+        # self.register_parameter('conv0', init_weight(widths[0], 3, 3, 3))
+        self.conv0 = Conv('conv0', 3, widths[0], 3, binarize)
 
         self.group0 = self._make_block(widths[0], n)
         self.group1 = self._make_block(widths[1], n, downsample=True)
         self.group2 = self._make_block(widths[2], n, downsample=True)
 
         self.bn = nn.BatchNorm2d(widths[2], affine=False)
-        self.register_parameter('conv_last', init_weight(num_classes, widths[2], 1, 1))
+        # self.register_parameter('conv_last', init_weight(num_classes, widths[2], 1, 1))
+        self.conv_last = Conv('conv_last', widths[2], num_classes, 1, binarize)
         self.bn_last = nn.BatchNorm2d(num_classes)
 
     def _make_block(self, width, n, downsample=False):
@@ -115,11 +132,11 @@ class WRN_McDonnell(ModuleBinarizable):
                                          for i in range(n)))
 
     def forward(self, x):
-        h = F.conv2d(x, self.conv0, padding=1)
+        h = self.conv0(x)  # F.conv2d(x, self.conv0, padding=1)
         h = self.group0(h)
         h = self.group1(h)
         h = self.group2(h)
         h = F.relu(self.bn(h))
-        h = F.conv2d(h, self.conv_last)
+        h = self.conv_last(h)  # F.conv2d(h, self.conv_last)
         h = self.bn_last(h)
         return F.avg_pool2d(h, kernel_size=h.shape[-2:]).view(h.shape[0], -1)
