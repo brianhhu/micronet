@@ -120,7 +120,7 @@ class WRN_McDonnell(ModuleBinarizable):
         self.bn = nn.BatchNorm2d(widths[2], affine=False)
         # self.register_parameter('conv_last', init_weight(num_classes, widths[2], 1, 1))
         self.conv_last = Conv(widths[2], num_classes, 1, binarize)
-        self.bn_last = nn.BatchNorm2d(num_classes)
+        self.bn_last = nn.BatchNorm2d(num_classes, affine=False)
 
     def _make_block(self, width, n, downsample=False):
         def select_block(j):
