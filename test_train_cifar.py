@@ -5,7 +5,7 @@ FLAGS = test_utils.parse_common_options(
     batch_size=125,
     num_epochs=254,
     momentum=0.9,
-    lr=0.1,
+    lr=0.8,
     target_accuracy=80.0)
 
 import os
