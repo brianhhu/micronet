@@ -60,9 +60,9 @@ class Block(ModuleBinarizable):
 
     def __init__(self, width, binarize=False):
         super().__init__(binarize)
-        self.bn0 = nn.BatchNorm2d(width, affine=False)
+        self.bn0 = nn.BatchNorm2d(width, affine=False, track_running_stats=False)
         self.register_parameter('conv0', init_weight(width, width, 3, 3))
-        self.bn1 = nn.BatchNorm2d(width, affine=False)
+        self.bn1 = nn.BatchNorm2d(width, affine=False, track_running_stats=False)
         self.register_parameter('conv1', init_weight(width, width, 3, 3))
 
     def forward(self, x):
@@ -79,9 +79,9 @@ class DownsampleBlock(ModuleBinarizable):
 
     def __init__(self, width, binarize=False):
         super().__init__(binarize)
-        self.bn0 = nn.BatchNorm2d(width // 2, affine=False)
+        self.bn0 = nn.BatchNorm2d(width // 2, affine=False, track_running_stats=False)
         self.register_parameter('conv0', init_weight(width, width // 2, 3, 3))
-        self.bn1 = nn.BatchNorm2d(width, affine=False)
+        self.bn1 = nn.BatchNorm2d(width, affine=False, track_running_stats=False)
         self.register_parameter('conv1', init_weight(width, width, 3, 3))
 
     def forward(self, x):
@@ -116,9 +116,9 @@ class WRN_McDonnell(ModuleBinarizable):
         self.group1 = self._make_block(widths[1], n, downsample=True)
         self.group2 = self._make_block(widths[2], n, downsample=True)
 
-        self.bn = nn.BatchNorm2d(widths[2], affine=False)
+        self.bn = nn.BatchNorm2d(widths[2], affine=False, track_running_stats=False)
         self.conv_last = Conv(widths[2], num_classes, 1, binarize)
-        self.bn_last = nn.BatchNorm2d(num_classes, affine=False)
+        self.bn_last = nn.BatchNorm2d(num_classes, affine=False, track_running_stats=False)
 
     def _make_block(self, width, n, downsample=False):
         def select_block(j):
