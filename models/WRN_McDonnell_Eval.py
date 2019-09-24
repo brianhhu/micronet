@@ -32,14 +32,16 @@ class Block(nn.Module):
     """Pre-activated ResNet block.
     """
 
-    def __init__(self, width):
+    def __init__(self, width, reduced_width=None):
         super().__init__()
+        if reduced_width is None:
+            reduced_width = width
         self.bn0 = nn.BatchNorm2d(width, affine=False)
         self.relu0 = nn.ReLU(inplace=True)
-        self.conv0 = nn.Conv2d(width, width, 3, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(width, affine=False)
+        self.conv0 = nn.Conv2d(width, reduced_width, 3, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(reduced_width, affine=False)
         self.relu1 = nn.ReLU(inplace=True)
-        self.conv1 = nn.Conv2d(width, width, 3, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(reduced_width, width, 3, padding=1, bias=False)
         self.add = EltwiseAdd()
 
     def forward(self, x):
@@ -54,14 +56,16 @@ class DownsampleBlock(nn.Module):
     Does F.avg_pool2d + torch.cat instead of strided conv.
     """
 
-    def __init__(self, width):
+    def __init__(self, width, reduced_width=None):
         super().__init__()
+        if reduced_width is None:
+            reduced_width = width
         self.bn0 = nn.BatchNorm2d(width // 2, affine=False)
         self.relu0 = nn.ReLU(inplace=True)
-        self.conv0 = nn.Conv2d(width // 2, width, 3, padding=1, stride=2, bias=False)
-        self.bn1 = nn.BatchNorm2d(width, affine=False)
+        self.conv0 = nn.Conv2d(width // 2, reduced_width, 3, padding=1, stride=2, bias=False)
+        self.bn1 = nn.BatchNorm2d(reduced_width, affine=False)
         self.relu1 = nn.ReLU(inplace=True)
-        self.conv1 = nn.Conv2d(width, width, 3, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(reduced_width, width, 3, padding=1, bias=False)
         self.pool = nn.AvgPool2d(3, padding=1, stride=2)
         self.concat = Concat(dim=1)
         self.add = EltwiseAdd()
@@ -86,16 +90,18 @@ class WRN_McDonnell_Eval(nn.Module):
     First and last convolutional layers are kept in float32.
     """
 
-    def __init__(self, depth, width, num_classes):
+    def __init__(self, depth, width, num_classes, cfg=None):
         super().__init__()
         widths = [int(v * width) for v in (16, 32, 64)]
         n = (depth - 2) // 6
+        if cfg is None:
+            cfg = [w for w in widths for i in range(n)]
 
         self.conv0 = nn.Conv2d(3, widths[0], 3, padding=1, bias=False)
 
-        self.group0 = self._make_block(widths[0], n)
-        self.group1 = self._make_block(widths[1], n, downsample=True)
-        self.group2 = self._make_block(widths[2], n, downsample=True)
+        self.group0 = self._make_block(widths[0], n, cfg[:n])
+        self.group1 = self._make_block(widths[1], n, cfg[n:(2*n)], downsample=True)
+        self.group2 = self._make_block(widths[2], n, cfg[(2*n):(3*n)], downsample=True)
 
         self.bn = nn.BatchNorm2d(widths[2], affine=False)
         self.relu = nn.ReLU(inplace=True)
@@ -103,11 +109,11 @@ class WRN_McDonnell_Eval(nn.Module):
         self.bn_last = nn.BatchNorm2d(num_classes, affine=False)
         self.pool = nn.AvgPool2d(8)
 
-    def _make_block(self, width, n, downsample=False):
+    def _make_block(self, width, n, cfg, downsample=False):
         def select_block(j):
             if downsample and j == 0:
-                return DownsampleBlock(width)
-            return Block(width)
+                return DownsampleBlock(width, cfg[j])
+            return Block(width, cfg[j])
         return nn.Sequential(OrderedDict(('block%d' % i, select_block(i))
                                          for i in range(n)))
 
