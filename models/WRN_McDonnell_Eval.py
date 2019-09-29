@@ -32,10 +32,8 @@ class Block(nn.Module):
     """Pre-activated ResNet block.
     """
 
-    def __init__(self, width, reduced_width=None):
+    def __init__(self, width, reduced_width):
         super().__init__()
-        if reduced_width is None:
-            reduced_width = width
         self.bn0 = nn.BatchNorm2d(width, affine=False)
         self.relu0 = nn.ReLU(inplace=True)
         self.conv0 = nn.Conv2d(width, reduced_width, 3, padding=1, bias=False)
@@ -56,10 +54,8 @@ class DownsampleBlock(nn.Module):
     Does F.avg_pool2d + torch.cat instead of strided conv.
     """
 
-    def __init__(self, width, reduced_width=None):
+    def __init__(self, width, reduced_width):
         super().__init__()
-        if reduced_width is None:
-            reduced_width = width
         self.bn0 = nn.BatchNorm2d(width // 2, affine=False)
         self.relu0 = nn.ReLU(inplace=True)
         self.conv0 = nn.Conv2d(width // 2, reduced_width, 3, padding=1, stride=2, bias=False)
