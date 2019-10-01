@@ -1,10 +1,10 @@
 import argparse
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
-from models import WRN_McDonnell_Eval
+from models import WRN_McDonnell
 from utilities import Cutout, RandomPixelPad
 
+from prune import rsetattr
 import torchvision.transforms as T
 import torchvision.datasets as datasets
 
@@ -44,23 +44,21 @@ def main():
     def cast(x):
         return x.cuda() if have_cuda else x
 
-    model = WRN_McDonnell_Eval(20, 10, 100)
+    model = WRN_McDonnell(20, 10, 100, binarize=True)
+    # Reset batch norm track_running_stats
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.BatchNorm2d):
+            rsetattr(model, name, torch.nn.BatchNorm2d(module.num_features, affine=False))
     checkpoint = torch.load(args.checkpoint)
-
-    weights_unpacked = {}
-    for k, w in checkpoint.items():
-        if 'conv' in k and 'weight' not in k:
-            k += '.weight'
-        weights_unpacked[k] = w.sign() * np.sqrt(2 / (w.shape[1]*w.shape[2]*w.shape[3]))
 
     # Create dataloader
     train_data_loader = DataLoader(create_dataset(train=True), 1000, shuffle=True)
     data_loader = DataLoader(create_dataset(train=False), 1000)
 
-    model.load_state_dict(weights_unpacked, strict=False)
+    model.load_state_dict(checkpoint, strict=False)
     model = cast(model)
 
-    # To learn batch norm means and variances
+    # Learn batch norm means and variances
     model.train()
     for inputs, _ in train_data_loader:
         with torch.no_grad():

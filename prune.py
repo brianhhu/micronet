@@ -1,4 +1,3 @@
-import math
 import torch
 import numpy as np
 import torch.nn as nn
@@ -8,7 +7,7 @@ import torchvision.transforms as T
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
 
-from models import WRN_McDonnell_Eval
+from models import WRN_McDonnell, WRN_McDonnell_Eval
 
 
 def create_dataset(train):
@@ -27,6 +26,7 @@ def rsetattr(obj, attr, val):
 
 def rgetattr(obj, attr, *args):
     import functools
+
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
     return functools.reduce(_getattr, [obj] + attr.split('.'))
@@ -37,7 +37,7 @@ def save_conv_output(activations, name):
     Saves layer output in activations dict with name key
     """
     def get_activation(m, i, o):
-        activations[name] = o.data.cpu().numpy()
+        activations[name] = F.relu(o).data.cpu().numpy()
 
     return get_activation
 
@@ -52,9 +52,8 @@ def extract_features(model, input):
 
     # register hooks
     for name, module in model.named_modules():
-        # Note: we only select rectified outputs
-        # if isinstance(module, nn.ReLU):
-        if 'relu1' in name:
+        # Note: we only select bn1 outputs
+        if 'bn1' in name:
             handle_list += [module.register_forward_hook(
                 save_conv_output(activations, name))]
 
@@ -165,8 +164,11 @@ def cluster_weights_agglo(weight, threshold):
 
 def main():
     # Create model
-    model = WRN_McDonnell_Eval(20, 10, 100)
-    model.load_state_dict(torch.load('./checkpoints/model_trained.pt'))
+    model = WRN_McDonnell(20, 10, 100, binarize=True)
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.BatchNorm2d):
+            rsetattr(model, name, torch.nn.BatchNorm2d(module.num_features, affine=False))
+    model.load_state_dict(torch.load('./checkpoints/model.pt'))
     model.to("cuda")
     model.eval()
 
@@ -200,111 +202,74 @@ def main():
     for key, val in outputs.items():
         # choose channel importance metric
         # channel_act = activation_channels_l1(val)  # 75.07
-        # channel_act = activation_channels_means(val)  # 75.07
+        channel_act = activation_channels_means(val)  # 75.07
         # channel_act = activation_channels_max(val)  # 71.16
-        channel_act = activation_channels_apoz(val)  # 72.74
+        # channel_act = activation_channels_apoz(val)  # 72.74
 
         # sort by metric
         ids = np.argsort(channel_act)[::-1]
         ids = ids[:int(keep_frac*len(channel_act))]
 
-        mask_dict[key] = np.zeros_like(channel_act)
-        mask_dict[key][ids] = 1
+        mask_dict[key] = list(ids)
 
     # Convert dict to list of tuples
     mask_list = [(k, v) for k, v in mask_dict.items()]
 
     # Iterate over model
     cnt = 0
-    for (name, module) in list(model.named_modules())[2:]:
+    width_list = []
+    for (name, param) in list(model.named_parameters())[1:]:
         if 'conv0' in name:
-            clust_id = np.where(mask_list[cnt][1])[0].tolist()
+            clust_id = mask_list[cnt][1]
             n_clust = len(clust_id)
+            width_list.append(n_clust)
+            print(n_clust)
 
             # Create new conv
-            weight = module.weight.data.cpu().numpy()
-            new_conv = nn.Conv2d(in_channels = module.in_channels,
-                                 out_channels = n_clust,
-                                 kernel_size = module.kernel_size,
-                                 stride = module.stride,
-                                 padding = module.padding,
-                                 bias = (module.bias is not None))
-            new_conv.weight.data = torch.from_numpy(weight[clust_id]).to('cuda')
-            rsetattr(model, name, new_conv)
-        if 'bn1' in name:
+            rsetattr(model, name, nn.Parameter(param[clust_id]))
+
             # Create new bn
+            bn_name = name[:-5]+'bn1'
+            old_bn = rgetattr(model, bn_name)
             new_bn = nn.BatchNorm2d(num_features = n_clust, affine = False).to('cuda')
-            new_bn.running_mean = module.running_mean[clust_id]
-            new_bn.running_var = module.running_var[clust_id]
-            new_bn.num_batches_tracked = module.num_batches_tracked
-            rsetattr(model, name, new_bn)
+            new_bn.running_mean = old_bn.running_mean[clust_id]
+            new_bn.running_var = old_bn.running_var[clust_id]
+            new_bn.num_batches_tracked = old_bn.num_batches_tracked
+            rsetattr(model, bn_name, new_bn)
         if 'conv1' in name:
             # Create new conv
-            weight = module.weight.data.cpu().numpy()
-            new_conv = nn.Conv2d(in_channels = n_clust,
-                                 out_channels = module.out_channels,
-                                 kernel_size = module.kernel_size,
-                                 stride = module.stride,
-                                 padding = module.padding,
-                                 bias = (module.bias is not None))
-            new_conv.weight.data = torch.from_numpy(weight[:, clust_id]).to('cuda')
-            # Re-scale weight for next conv
-            new_conv.weight.data = new_conv.weight.data.sign() * math.sqrt(2. /
-                                (n_clust * new_conv.weight.data.shape[2] * new_conv.weight.data.shape[3]))
-            rsetattr(model, name, new_conv)
+            rsetattr(model, name, nn.Parameter(param[:, clust_id]))
             cnt += 1
-
-    # # Check if activations are zeroed out
-    # outputs = extract_features(model, inputs)
-    # outputs_filtered = {key: outputs[key] for key in outputs.keys() if 'relu1' in key}
-
-    # # Confirm units are actually zero-ed out
-    # [l[:,np.where(ids==0)].sum() for l,ids in zip(outputs_filtered.values(), mask_dict.values())]
 
 
     # """
     # Weight-based pruning
     # """
     # threshold = 0.75
+    # width_list = []
     # # Iterate over model
-    # for (name, module) in list(model.named_modules())[2:]:
+    # for (name, param) in list(model.named_parameters())[1:]:
     #     if 'conv0' in name:
-    #         weight = module.weight.data.cpu().numpy()
+    #         weight = param.data.sign().cpu().numpy()
 
     #         # clust_id are the filters to keep
     #         n_clust, clust_id = cluster_weights_agglo(weight.reshape(weight.shape[0], -1), threshold)
+    #         width_list.append(n_clust)
     #         print(n_clust)
 
     #         # Create new conv
-    #         new_conv = nn.Conv2d(in_channels = module.in_channels,
-    #                              out_channels = n_clust,
-    #                              kernel_size = module.kernel_size,
-    #                              stride = module.stride,
-    #                              padding = module.padding,
-    #                              bias = (module.bias is not None))
-    #         new_conv.weight.data = torch.from_numpy(weight[clust_id]).to('cuda')
-    #         rsetattr(model, name, new_conv)
-    #     if 'bn1' in name:
+    #         rsetattr(model, name, nn.Parameter(param[clust_id]))
+
     #         # Create new bn
+    #         bn_name = name[:-5]+'bn1'
+    #         old_bn = rgetattr(model, bn_name)
     #         new_bn = nn.BatchNorm2d(num_features = n_clust, affine = False).to('cuda')
-    #         new_bn.running_mean = module.running_mean[clust_id]
-    #         new_bn.running_var = module.running_var[clust_id]
-    #         new_bn.num_batches_tracked = module.num_batches_tracked
-    #         rsetattr(model, name, new_bn)
+    #         new_bn.running_mean = old_bn.running_mean[clust_id]
+    #         new_bn.running_var = old_bn.running_var[clust_id]
+    #         new_bn.num_batches_tracked = old_bn.num_batches_tracked
+    #         rsetattr(model, bn_name, new_bn)
     #     if 'conv1' in name:
-    #         # Create new conv
-    #         weight = module.weight.data.cpu().numpy()
-    #         new_conv = nn.Conv2d(in_channels = n_clust,
-    #                              out_channels = module.out_channels,
-    #                              kernel_size = module.kernel_size,
-    #                              stride = module.stride,
-    #                              padding = module.padding,
-    #                              bias = (module.bias is not None))
-    #         new_conv.weight.data = torch.from_numpy(weight[:, clust_id]).to('cuda')
-    #         # Re-scale weight for next conv
-    #         new_conv.weight.data = new_conv.weight.data.sign() * math.sqrt(2. /
-    #                             (n_clust * new_conv.weight.data.shape[2] * new_conv.weight.data.shape[3]))
-    #         rsetattr(model, name, new_conv)
+    #         rsetattr(model, name, nn.Parameter(param[:, clust_id]))
 
     model.eval()
     correct = 0
@@ -320,6 +285,19 @@ def main():
             correct += predicted.eq(targets).sum().item()
 
     print(100.*correct/total)
+
+    # Save model state dict and number of filters in each layer
+    model_eval = WRN_McDonnell_Eval(20, 10, 100, width_list)
+    weights_unpacked = {}
+    for k, w in model.state_dict().items():
+        if 'conv' in k:
+            if 'weight' not in k:
+                k += '.weight'
+            weights_unpacked[k] = w.sign() * np.sqrt(2 / (w.shape[1]*w.shape[2]*w.shape[3]))
+        else:
+            weights_unpacked[k] = w
+    model_eval.load_state_dict(weights_unpacked)
+    torch.save({'state_dict': model_eval.state_dict(), 'config': width_list}, 'model_prune.pt')
 
 
 if __name__ == '__main__':
