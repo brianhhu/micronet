@@ -141,8 +141,11 @@ def print_model_param_flops(model, input_res=32, multiply_adds=True, binary_conv
 
 
 def main():
+    # Load state dict
+    state_dict = torch.load('./checkpoints/model_prune.pt')
+
     # Create model
-    model = WRN_McDonnell_Eval(20, 10, 100)
+    model = WRN_McDonnell_Eval(20, 10, 100, cfg=state_dict['config'])
 
     # Print params and flops
     print_model_param_nums(model)

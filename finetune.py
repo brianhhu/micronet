@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 
 import torchvision.transforms as T
 import torchvision.datasets as datasets
@@ -58,7 +57,7 @@ class FilterPrunner:
         return out
 
     def get_activation_and_grad(self, m, i, o):
-        self.activations.append(F.relu(o))
+        self.activations.append(o)
         o.register_hook(self.compute_rank)
 
     def compute_rank(self, grad):
@@ -67,7 +66,7 @@ class FilterPrunner:
 
         taylor = activation * grad
         # Get the average value for every filter,
-        # accross all the other dimensions
+        # across all the other dimensions
         taylor = taylor.mean(dim=(0, 2, 3)).data
 
         if activation_index not in self.filter_ranks:
@@ -203,7 +202,7 @@ class PrunningFineTuner:
 
         iterations = 5  # int(iterations * 2.0 / 3)
 
-        print("Number of prunning iterations to reduce 67% filters", iterations)
+        print("Number of prunning iterations", iterations)
 
         for _ in range(iterations):
             print("Ranking filters.. ")
@@ -245,7 +244,7 @@ class PrunningFineTuner:
             print("Filters prunned", str(message))
             self.test()
             print("Fine tuning to recover from prunning iteration.")
-            optimizer = optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9)  # Should lr be 0.0001?
+            optimizer = optim.SGD(self.model.parameters(), lr=0.0001, momentum=0.9)  # Should lr be 0.0001?
             self.train(optimizer, epochs = 10)
 
 

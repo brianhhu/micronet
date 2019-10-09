@@ -67,23 +67,6 @@ def extract_features(model, input):
     return activations
 
 
-def activation_channels_l1(activation):
-    """Calculate the L1-norms of an activation's channels.
-    The activation usually has the shape: (batch_size, num_channels, h, w).
-    Returns - for each channel: the batch-mean of its L1 magnitudes (i.e. over all of the
-    activations in the mini-batch, compute the mean of the L! magnitude of each channel).
-    """
-    if activation.ndim == 4:
-        view_2d = activation.reshape(activation.shape[0], activation.shape[1], -1)
-        featuremap_norms_mat = np.linalg.norm(view_2d, ord=1, axis=2)
-    elif activation.ndim == 2:
-        featuremap_norms_mat = np.linalg.norm(activation, ord=1, axis=1)  # batch x 1
-    else:
-        raise ValueError("activation_channels_l1: Unsupported shape: ".format(activation.shape))
-
-    return featuremap_norms_mat.mean(axis=0)
-
-
 def activation_channels_means(activation):
     """Calculate the mean of each of an activation's channels.
     The activation usually has the shape: (batch_size, num_channels, h, w).
@@ -102,7 +85,6 @@ def activation_channels_means(activation):
     return featuremap_means_mat.mean(axis=0)
 
 
-# IDEA: Max over space, and L2 norm over examples
 def activation_channels_max(activation):
     """Calculate the max of each of an activation's channels.
     The activation usually has the shape: (batch_size, num_channels, h, w).
@@ -176,84 +158,51 @@ def main():
     train_data_loader = DataLoader(create_dataset(train=True), 32)
     data_loader = DataLoader(create_dataset(train=False), 32)
 
-    """
-    Activation-based pruning
-    """
-    # Get a batch of inputs
-    outputs = None
-    for inputs, _ in train_data_loader:
-        with torch.no_grad():
-
-            inputs = inputs.to('cuda')
-
-            if outputs is None:
-                outputs = extract_features(model, inputs)
-                break
-            # else:
-            #     temp = extract_features(model, inputs)
-            #     for key, val in outputs.items():
-            #         outputs[key] = np.concatenate((val, temp[key]))
-
-    # Fraction of channels to keep
-    keep_frac = 0.95
-
-    # Compute masks
-    mask_dict = {}
-    for key, val in outputs.items():
-        # choose channel importance metric
-        # channel_act = activation_channels_l1(val)  # 75.07
-        channel_act = activation_channels_means(val)  # 75.07
-        # channel_act = activation_channels_max(val)  # 71.16
-        # channel_act = activation_channels_apoz(val)  # 72.74
-
-        # sort by metric
-        ids = np.argsort(channel_act)[::-1]
-        ids = ids[:int(keep_frac*len(channel_act))]
-
-        mask_dict[key] = list(ids)
-
-    # Convert dict to list of tuples
-    mask_list = [(k, v) for k, v in mask_dict.items()]
-
-    # Iterate over model
-    cnt = 0
-    width_list = []
-    for (name, param) in list(model.named_parameters())[1:]:
-        if 'conv0' in name:
-            clust_id = mask_list[cnt][1]
-            n_clust = len(clust_id)
-            width_list.append(n_clust)
-            print(n_clust)
-
-            # Create new conv
-            rsetattr(model, name, nn.Parameter(param[clust_id]))
-
-            # Create new bn
-            bn_name = name[:-5]+'bn1'
-            old_bn = rgetattr(model, bn_name)
-            new_bn = nn.BatchNorm2d(num_features = n_clust, affine = False).to('cuda')
-            new_bn.running_mean = old_bn.running_mean[clust_id]
-            new_bn.running_var = old_bn.running_var[clust_id]
-            new_bn.num_batches_tracked = old_bn.num_batches_tracked
-            rsetattr(model, bn_name, new_bn)
-        if 'conv1' in name:
-            # Create new conv
-            rsetattr(model, name, nn.Parameter(param[:, clust_id]))
-            cnt += 1
-
-
     # """
-    # Weight-based pruning
+    # Activation-based pruning
     # """
-    # threshold = 0.75
-    # width_list = []
+    # # Get a batch of inputs
+    # outputs = None
+    # for inputs, _ in train_data_loader:
+    #     with torch.no_grad():
+
+    #         inputs = inputs.to('cuda')
+
+    #         if outputs is None:
+    #             outputs = extract_features(model, inputs)
+    #             break
+    #         # else:
+    #         #     temp = extract_features(model, inputs)
+    #         #     for key, val in outputs.items():
+    #         #         outputs[key] = np.concatenate((val, temp[key]))
+
+    # # Fraction of channels to keep
+    # keep_frac = 0.95
+
+    # # Compute masks
+    # mask_dict = {}
+    # for key, val in outputs.items():
+    #     # choose channel importance metric
+    #     channel_act = activation_channels_means(val)  # 74.58
+    #     # channel_act = activation_channels_max(val)  # 70.61
+    #     # channel_act = activation_channels_apoz(val)  # 73.36
+
+    #     # sort by metric
+    #     ids = np.argsort(channel_act)[::-1]
+    #     ids = ids[:int(keep_frac*len(channel_act))]
+
+    #     mask_dict[key] = list(ids)
+
+    # # Convert dict to list of tuples
+    # mask_list = [(k, v) for k, v in mask_dict.items()]
+
     # # Iterate over model
+    # cnt = 0
+    # width_list = []
     # for (name, param) in list(model.named_parameters())[1:]:
     #     if 'conv0' in name:
-    #         weight = param.data.sign().cpu().numpy()
-
-    #         # clust_id are the filters to keep
-    #         n_clust, clust_id = cluster_weights_agglo(weight.reshape(weight.shape[0], -1), threshold)
+    #         clust_id = mask_list[cnt][1]
+    #         n_clust = len(clust_id)
     #         width_list.append(n_clust)
     #         print(n_clust)
 
@@ -269,7 +218,38 @@ def main():
     #         new_bn.num_batches_tracked = old_bn.num_batches_tracked
     #         rsetattr(model, bn_name, new_bn)
     #     if 'conv1' in name:
+    #         # Create new conv
     #         rsetattr(model, name, nn.Parameter(param[:, clust_id]))
+    #         cnt += 1
+
+    """
+    Weight-based pruning
+    """
+    threshold = 0.75  # 80.4
+    width_list = []
+    # Iterate over model
+    for (name, param) in list(model.named_parameters())[1:]:
+        if 'conv0' in name:
+            weight = param.data.sign().cpu().numpy()
+
+            # clust_id are the filters to keep
+            n_clust, clust_id = cluster_weights_agglo(weight.reshape(weight.shape[0], -1), threshold)
+            width_list.append(n_clust)
+            print(n_clust)
+
+            # Create new conv
+            rsetattr(model, name, nn.Parameter(param[clust_id]))
+
+            # Create new bn
+            bn_name = name[:-5]+'bn1'
+            old_bn = rgetattr(model, bn_name)
+            new_bn = nn.BatchNorm2d(num_features = n_clust, affine = False).to('cuda')
+            new_bn.running_mean = old_bn.running_mean[clust_id]
+            new_bn.running_var = old_bn.running_var[clust_id]
+            new_bn.num_batches_tracked = old_bn.num_batches_tracked
+            rsetattr(model, bn_name, new_bn)
+        if 'conv1' in name:
+            rsetattr(model, name, nn.Parameter(param[:, clust_id]))
 
     model.eval()
     correct = 0
@@ -297,7 +277,8 @@ def main():
         else:
             weights_unpacked[k] = w
     model_eval.load_state_dict(weights_unpacked)
-    torch.save({'state_dict': model_eval.state_dict(), 'config': width_list}, 'model_prune.pt')
+    torch.save({'state_dict': model_eval.state_dict(),
+                'config': width_list}, './checkpoints/model_prune.pt')
 
 
 if __name__ == '__main__':
